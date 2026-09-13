@@ -84,7 +84,11 @@ export function loadCatalog(fallback) {
 export async function fetchRemoteCatalog(fallback = [], options = {}) {
   const { fallbackOnError = true } = options;
   try {
-    const res = await fetch("/api/catalog", { cache: "no-store" });
+    const res = await fetch("/api/catalog", {
+      // Allow the browser/CDN to reuse a recent public catalog response.
+      cache: "default",
+      headers: { Accept: "application/json" },
+    });
     if (!res.ok) throw new Error(`Catalog request failed (${res.status})`);
     const json = await res.json();
     if (!Array.isArray(json.products)) {

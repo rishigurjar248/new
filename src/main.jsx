@@ -57,8 +57,11 @@ const categories = [
 const initialProducts = getInitialCatalog();
 // The public storefront uses Supabase as its source of truth. Do not render
 // the bundled one-product fallback while the remote catalog is loading.
-let products = [];
-let specialDeals = [];
+let products = initialProducts;
+let specialDeals = initialProducts
+  .filter((p) => p.isTop10)
+  .sort((a, b) => (Number(a.top10Rank) || 999999) - (Number(b.top10Rank) || 999999))
+  .slice(0, 10);
 
 const heroSlides = [
   // Default hero: Stock Up Days poster. Other posters are shown only when
@@ -1260,14 +1263,15 @@ function SpecialDealsPage({ onOpen, onAdd, onWish, wished, onSeen, onBack }) {
 }
 function App() {
   const [catalogVersion, refreshCatalog] = useState(0);
-  const [catalogStatus, setCatalogStatus] = useState("loading");
+  // Render the bundled catalog immediately. The live catalog refreshes in the
+  // background, so a slow network never blocks the storefront shell.
+  const [catalogStatus, setCatalogStatus] = useState("ready");
   const [catalogError, setCatalogError] = useState("");
   useEffect(() => {
     let cancelled = false;
-    setCatalogStatus("loading");
-    fetchRemoteCatalog([], { fallbackOnError: false })
+    fetchRemoteCatalog(initialProducts, { fallbackOnError: true })
       .then((remote) => {
-        if (cancelled) return;
+        if (cancelled || !Array.isArray(remote) || remote.length === 0) return;
         products = remote;
         specialDeals = remote
           .filter((p) => p.isTop10)
@@ -1279,11 +1283,8 @@ function App() {
       })
       .catch((error) => {
         if (cancelled) return;
-        products = [];
-        specialDeals = [];
-        setCatalogError(error?.message || "Unable to load the latest products.");
-        setCatalogStatus("error");
-        refreshCatalog((x) => x + 1);
+        // Keep already-rendered fallback products visible if the refresh fails.
+        setCatalogError(error?.message || "Unable to refresh the latest products.");
       });
     return () => { cancelled = true; };
   }, []);

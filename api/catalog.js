@@ -72,11 +72,15 @@ export default async function handler(req, res) {
   if (req.method === "GET") {
     const { data, error } = await db
       .from("products")
-      .select("*")
+      .select("id,page,name,brand,category,price,mrp,old_price,discount,rating,reviews,review_count,image,gallery_images,images,key_points,description,is_top10,top10_rank,is_active")
       .eq("is_active", true)
       .order("top10_rank", { ascending: true, nullsFirst: false })
       .order("created_at", { ascending: false });
     if (error) return res.status(500).json({ error: error.message });
+    // Public catalog data is identical for most visitors. Cache it briefly at
+    // Vercel's edge while allowing stale data during a background refresh.
+    res.setHeader("Cache-Control", "public, s-maxage=30, stale-while-revalidate=120");
+    res.setHeader("CDN-Cache-Control", "public, s-maxage=30, stale-while-revalidate=120");
     return res.status(200).json({ products: (data ?? []).map(mapRow) });
   }
 
